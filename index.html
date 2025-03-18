@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Test of elym</title>
+  </head>
+  <body>
+    <h1>Test of elym</h1>
+    <p>Test of elym</p>
+    <section class="container"></section>
+    <script type="module">
+        import { Elym } from "./src/elym/elym.ts";
+        const container = Elym.select(".container").append("p").text("Hello, world!");
+        container.attr("id", "elym");
+    </script>
+  </body>
+</html>

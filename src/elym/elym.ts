@@ -24,7 +24,9 @@ export class Elym {
    * document.body.appendChild(element); // Appends the element to the document body
    * ```
    */
-  public static createElement(htmlTemplate: string): HTMLElement | SVGElement {
+  public static createFromTemplate(
+    htmlTemplate: string
+  ): HTMLElement | SVGElement {
     // Check if the HTML string appears to be an SVG element.
     // A simple check for the presence of "<svg" at the beginning is sufficient for most cases.
     if (htmlTemplate.trim().startsWith("<svg")) {
@@ -51,27 +53,76 @@ export class Elym {
   }
 
   /**
-   * Creates an Elym object to help manipulate the DOM elements.
-   * @param {string} htmlTemplate - The HTML template to create the root element.
+   * Selects a single element from the DOM.
+   * @param {string} selector - The CSS selector to match the element.
+   * @returns {Elym} A new Elym instance wrapping the selected element.
+   * @example
+   * ```ts
+   * const builder = Elym.select("body");
+   * builder.text("Hello, Elym!");
+   * ```
+   */
+  public static select(selector: string): Elym {
+    const element = document.querySelector(selector);
+    if (!element) {
+      throw new Error(`No element found for selector: ${selector}`);
+    }
+    return new Elym(element as HTMLElement);
+  }
+
+  /**
+   * Selects multiple elements from the DOM.
+   * @param {string} selector - The CSS selector to match the elements.
+   * @returns {Elym} A new Elym instance wrapping the selected elements.
+   * @example
+   * ```ts
+   * const builder = Elym.selectAll("div");
+   * builder.each((node) => node.classList.add("selected"));
+   * ```
+   */
+  public static selectAll(selector: string): Elym {
+    const elements = Array.from(document.querySelectorAll(selector));
+    return new Elym(elements);
+  }
+
+  /**
+   * Creates a new Elym instance.
+   * @param {string | Element | Element[]} htmlTemplateOrElement - The HTML template string or an HTML or SVG element.
+   * @throws {Error} - If the argument is invalid.
    * @example
    * ```ts
    * const builder = new Elym('<div class="container"><h1>Hello, World!</h1></div>');
-   * document.body.appendChild(builder.root());
    * ```
    */
-  constructor(htmlTemplate: string) {
-    const rootElement = Elym.createElement(htmlTemplate);
-    if (
-      !(
-        rootElement instanceof HTMLElement ||
-        rootElement instanceof SVGSVGElement
-      )
-    ) {
-      throw new Error("Invalid root element created");
+  constructor(htmlTemplateOrElement: string | Element | Element[]) {
+    switch (typeof htmlTemplateOrElement) {
+      case "string":
+        const rootElement = Elym.createFromTemplate(htmlTemplateOrElement);
+        if (
+          !(rootElement instanceof HTMLElement || rootElement instanceof SVGSVGElement)
+        ) {
+          throw new Error("Invalid root element created");
+        }
+        this.#root = rootElement;
+        this.#nodes = [this._root];
+        Elym.instances.set(this._root, this);
+        break;
+      case "object":
+        if (htmlTemplateOrElement instanceof HTMLElement) {
+          this.#root = htmlTemplateOrElement;
+          this.#nodes = [htmlTemplateOrElement];
+          Elym.instances.set(htmlTemplateOrElement, this);
+        } else if (htmlTemplateOrElement instanceof NodeList || Array.isArray(htmlTemplateOrElement)) {
+          this.#root = htmlTemplateOrElement[0] as HTMLElement;
+          this.#nodes = Array.from(htmlTemplateOrElement) as HTMLElement[];
+          this.#nodes.forEach((node) => Elym.instances.set(node, this));
+        } else {
+          throw new Error("Invalid argument: must be a string, HTMLElement, NodeList, or array of HTML elements");
+        }
+        break;
+      default:
+        throw new Error("Invalid argument: must be a string, HTMLElement, NodeList, or array of HTML elements");
     }
-    this.#root = rootElement;
-    this.#nodes = [this._root];
-    Elym.instances.set(this._root, this);
   }
 
   /**
@@ -95,16 +146,16 @@ export class Elym {
   }
 
   /**
-   * Selects a single element within the constructed DOM structure.
+   * Selects a single child element within the constructed DOM structure.
    * @param {string} selector - The CSS selector to match the element.
    * @returns {this} The current instance for chaining.
    * @example
    * ```ts
    * const builder = new Elym('<div class="container"><h1>Hello, World!</h1></div>');
-   * builder.select("h1").text("Hello, Elym!");
+   * builder.selectChild("h1").text("Hello, Elym!");
    * ```
    */
-  public select(selector: string): this {
+  public selectChild(selector: string): this {
     const selectedElement = this._root.querySelector(selector);
     if (selectedElement) {
       this.#nodes = [selectedElement as HTMLElement];
@@ -113,17 +164,17 @@ export class Elym {
   }
 
   /**
-   * Selects multiple elements within the constructed DOM structure.
+   * Selects multiple child elements within the constructed DOM structure.
    * @param {string} selector - The CSS selector to match the elements.
    * @returns {this} The current instance for chaining.
    * @example
    * ```ts
    * const builder = new Elym('<ul><li>Item 1</li><li>Item 2</li></ul>');
-   * builder.selectAll("li").each((node, index) => {
+   * builder.selectChildren("li").each((node, index) => {
    *   console.log(`Item ${index + 1}: ${node.textContent}`);
    * });
    */
-  public selectAll(selector: string): this {
+  public selectChildren(selector: string): this {
     this.#nodes = Array.from(
       this._root.querySelectorAll(selector)
     ) as HTMLElement[];
@@ -182,38 +233,53 @@ export class Elym {
   }
 
   /**
-   * Appends a child element to the selected elements.
-   * @param {HTMLElement} child - The child element to append.
-   * @returns {this} The current instance for chaining.
+   * Appends a new element to the selected elements.
+   * @param {string} tagName - The tag name of the element to append.
+   * @returns {Elym} A new Elym instance wrapping the appended element.
    * @example
    * ```ts
-   * const builder = new Elym('<div class="container"></div>');
-   * const child = document.createElement("p");
-   * builder.appendChild(child);
-   * ``
-   *
+   * const builder = Elym.select(".container").append("span").attr("id", "myId");
+   * ```
    */
-  public appendChild(child: HTMLElement): this {
-    this._nodes.forEach((node) => node.appendChild(child));
-    return this;
+  public append(tagName: string): Elym {
+    const newElements: (HTMLElement | SVGElement)[] = [];
+    this._nodes.forEach((node) => {
+      let newElement: HTMLElement | SVGElement;
+      if (node instanceof SVGElement) {
+        newElement = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          tagName
+        );
+      } else {
+        newElement = document.createElement(tagName);
+      }
+
+      node.appendChild(newElement);
+      newElements.push(newElement);
+    });
+    return new Elym(newElements);
   }
 
   /**
-   * Appends multiple child elements to the selected elements.
-   * @param {...HTMLElement[]} children - The child elements to append.
+   * Appends multiple elements or Elym objects to the selected elements.
+   * @param {...(HTMLElement | Elym)[]} elements - The elements or Elym objects to append.
    * @returns {this} The current instance for chaining.
    * @example
    * ```ts
    * const builder = new Elym('<div class="container"></div>');
    * const child1 = document.createElement("p");
-   * const child2 = document.createElement("p");
-   * builder.appendChildren(child1, child2);
+   * const child2 = new Elym('<span></span>');
+   * builder.appendElements(child1, child2);
    * ```
    */
-  public appendChildren(...children: HTMLElement[]): this {
-    const fragment = document.createDocumentFragment();
-    children.forEach((child) => fragment.appendChild(child));
-    this._nodes.forEach((node) => node.appendChild(fragment.cloneNode(true)));
+  public appendElements(...elements: (HTMLElement | Elym)[]): this {
+    elements.forEach((element) => {
+      if (element instanceof Elym) {
+        this._nodes.forEach((node) => node.append(...element._nodes));
+      } else {
+        this._nodes.forEach((node) => node.append(element));
+      }
+    });
     return this;
   }
 
