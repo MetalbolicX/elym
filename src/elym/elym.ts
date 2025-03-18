@@ -67,7 +67,7 @@ export class Elym {
     if (!element) {
       throw new Error(`No element found for selector: ${selector}`);
     }
-    return new Elym(element as HTMLElement);
+    return Elym.fromElement(element as HTMLElement);
   }
 
   /**
@@ -82,47 +82,51 @@ export class Elym {
    */
   public static selectAll(selector: string): Elym {
     const elements = Array.from(document.querySelectorAll(selector));
-    return new Elym(elements);
+    return Elym.fromElement(...elements);
   }
 
   /**
    * Creates a new Elym instance.
-   * @param {string | Element | Element[]} htmlTemplateOrElement - The HTML template string or an HTML or SVG element.
+   * @param {string} htmlTemplate - The HTML template string.
    * @throws {Error} - If the argument is invalid.
    * @example
    * ```ts
    * const builder = new Elym('<div class="container"><h1>Hello, World!</h1></div>');
    * ```
    */
-  constructor(htmlTemplateOrElement: string | Element | Element[]) {
-    switch (typeof htmlTemplateOrElement) {
-      case "string":
-        const rootElement = Elym.createFromTemplate(htmlTemplateOrElement);
-        if (
-          !(rootElement instanceof HTMLElement || rootElement instanceof SVGSVGElement)
-        ) {
-          throw new Error("Invalid root element created");
-        }
-        this.#root = rootElement;
-        this.#nodes = [this._root];
-        Elym.instances.set(this._root, this);
-        break;
-      case "object":
-        if (htmlTemplateOrElement instanceof HTMLElement) {
-          this.#root = htmlTemplateOrElement;
-          this.#nodes = [htmlTemplateOrElement];
-          Elym.instances.set(htmlTemplateOrElement, this);
-        } else if (htmlTemplateOrElement instanceof NodeList || Array.isArray(htmlTemplateOrElement)) {
-          this.#root = htmlTemplateOrElement[0] as HTMLElement;
-          this.#nodes = Array.from(htmlTemplateOrElement) as HTMLElement[];
-          this.#nodes.forEach((node) => Elym.instances.set(node, this));
-        } else {
-          throw new Error("Invalid argument: must be a string, HTMLElement, NodeList, or array of HTML elements");
-        }
-        break;
-      default:
-        throw new Error("Invalid argument: must be a string, HTMLElement, NodeList, or array of HTML elements");
+  constructor(htmlTemplate: string) {
+    const rootElement = Elym.createFromTemplate(htmlTemplate);
+    if (
+      !(rootElement instanceof HTMLElement || rootElement instanceof SVGSVGElement)
+    ) {
+      throw new Error("Invalid root element created");
     }
+    this.#root = rootElement;
+    this.#nodes = [this._root];
+    Elym.instances.set(this._root, this);
+  }
+
+  /**
+   * Creates a new Elym instance from one or more elements.
+   * @param {...Element} elements - The HTML or SVG elements.
+   * @returns {Elym} A new Elym instance wrapping the provided elements.
+   * @throws {Error} - If no elements are provided.
+   * @example
+   * ```ts
+   * const element1 = document.createElement('div');
+   * const element2 = document.createElement('span');
+   * const builder = Elym.fromElement(element1, element2);
+   * ```
+   */
+  public static fromElement(...elements: Element[]): Elym {
+    if (elements.length === 0) {
+      throw new Error("At least one element must be provided");
+    }
+    const instance = new Elym('<div></div>'); // Temporary root element
+    instance.#root = elements[0] as HTMLElement;
+    instance.#nodes = elements as (HTMLElement | SVGElement)[];
+    instance.#nodes.forEach((node) => Elym.instances.set(node, instance));
+    return instance;
   }
 
   /**
@@ -257,7 +261,7 @@ export class Elym {
       node.appendChild(newElement);
       newElements.push(newElement);
     });
-    return new Elym(newElements);
+    return Elym.fromElement(...newElements);
   }
 
   /**
