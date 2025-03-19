@@ -30,7 +30,7 @@ const heroes = new Elym(`
 
 const container = document.getElementById("container");
 
-container.appendChild(heroes.root());
+container?.appendChild(heroes.root());
 ```
 
 ## Technologies used

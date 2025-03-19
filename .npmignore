@@ -2,3 +2,6 @@ test/
 src/
 node_modules/
 index.html
+.qodo
+.vscode/
+docs/
