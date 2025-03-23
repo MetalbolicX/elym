@@ -20,8 +20,8 @@ export class Elym {
    * @throws {Error} - If the HTML string is invalid or does not contain a valid element.
    * @example
    * ```ts
-   * const element = Elym.createElement(`<div class="example">Hello, world!</div>`); // Creates a div element with the class "example" and the text "Hello, world!"
-   * document.body.appendChild(element); // Appends the element to the document body
+   * const element = Elym.createElement(`<section class="container"><h1>Hello, World!</h1></section>`);
+   * document.body.appendChild(element.root());
    * ```
    */
   public static createFromTemplate(
@@ -53,13 +53,13 @@ export class Elym {
   }
 
   /**
-   * Selects a single element from the DOM.
+   * Selects a single element which is already in the DOM.
    * @param {string} selector - The CSS selector to match the element.
    * @returns {Elym} A new Elym instance wrapping the selected element.
    * @example
    * ```ts
-   * const builder = Elym.select("body");
-   * builder.text("Hello, Elym!");
+   * const title = Elym.select("h1");
+   * title.text("Hello, Elym!");
    * ```
    */
   public static select(selector: string): Elym {
@@ -71,13 +71,15 @@ export class Elym {
   }
 
   /**
-   * Selects multiple elements from the DOM.
+   * Selects multiple elements which are already in the DOM.
    * @param {string} selector - The CSS selector to match the elements.
    * @returns {Elym} A new Elym instance wrapping the selected elements.
    * @example
    * ```ts
-   * const builder = Elym.selectAll("div");
-   * builder.each((node) => node.classList.add("selected"));
+   * const list = Elym.selectAll("li");
+   * list.each((node, index) => {
+   *   console.log(`Item ${index + 1}: ${node.textContent}`);
+   * });
    * ```
    */
   public static selectAll(selector: string): Elym {
@@ -86,12 +88,36 @@ export class Elym {
   }
 
   /**
+   * Creates a new Elym instance from one or more elements.
+   * @param {...Element} elements - The HTML or SVG elements.
+   * @returns {Elym} A new Elym instance wrapping the provided elements.
+   * @throws {Error} - If no elements are provided.
+   * @example
+   * ```ts
+   * const element1 = document.createElement('div');
+   * const element2 = document.createElement('span');
+   * const elym = Elym.fromElement(element1, element2);
+   * ```
+   */
+  public static fromElement(...elements: Element[]): Elym {
+    if (elements.length === 0) {
+      throw new Error("At least one element must be provided");
+    }
+    const instance = new Elym('<div></div>'); // Temporary root element
+    instance.#root = elements[0] as HTMLElement;
+    instance.#nodes = elements as (HTMLElement | SVGElement)[];
+    instance.#nodes.forEach((node) => Elym.instances.set(node, instance));
+    return instance;
+  }
+
+  /**
    * Creates a new Elym instance.
    * @param {string} htmlTemplate - The HTML template string.
    * @throws {Error} - If the argument is invalid.
    * @example
    * ```ts
-   * const builder = new Elym('<div class="container"><h1>Hello, World!</h1></div>');
+   * const hello = new Elym('<div class="container"><h1>Hello, World!</h1></div>');
+   * document.body.appendChild(hello.root());
    * ```
    */
   constructor(htmlTemplate: string) {
@@ -107,56 +133,51 @@ export class Elym {
   }
 
   /**
-   * Creates a new Elym instance from one or more elements.
-   * @param {...Element} elements - The HTML or SVG elements.
-   * @returns {Elym} A new Elym instance wrapping the provided elements.
-   * @throws {Error} - If no elements are provided.
-   * @example
-   * ```ts
-   * const element1 = document.createElement('div');
-   * const element2 = document.createElement('span');
-   * const builder = Elym.fromElement(element1, element2);
-   * ```
-   */
-  public static fromElement(...elements: Element[]): Elym {
-    if (elements.length === 0) {
-      throw new Error("At least one element must be provided");
-    }
-    const instance = new Elym('<div></div>'); // Temporary root element
-    instance.#root = elements[0] as HTMLElement;
-    instance.#nodes = elements as (HTMLElement | SVGElement)[];
-    instance.#nodes.forEach((node) => Elym.instances.set(node, instance));
-    return instance;
-  }
-
-  /**
    * Retrieves the Elym instance associated with a given DOM element.
    * @param node - The HTML or SVG element for which to retrieve the Elym instance.
    * @returns The Elym instance associated with the given node, or null if no instance is found.
    * @example
    * ```ts
-   * const builder = new Elym('<div class="container"><h1>Hello, World!</h1></div>');
+   * const hello = new Elym('<div class="container"><h1>Hello, World!</h1></div>');
+   * document.body.appendChild(hello.root());
+   * // Retrieve the instance associated with the container
    * const container = document.querySelector(".container");
    * const instance = Elym.getInstance(container);
-   * console.log(instance === builder); // true
+   * instance.selectChild("h1").text("Hello, Elym!");
    * ```
    */
   public static getInstance(node: HTMLElement | SVGElement): Elym | null {
     return Elym.instances.get(node) || null;
   }
 
+  /**
+   * Checks if an Elym instance is associated with a given DOM element.
+   * @param node - The HTML or SVG element to check.
+   * @returns True if an instance is associated with the node, otherwise false.
+   * @example
+   * ```ts
+   * const hello = new Elym('<div class="container"><h1>Hello, World!</h1></div>');
+   * document.body.appendChild(hello.root());
+   * // Check if an instance is associated with the container
+   * const container = document.querySelector(".container");
+   * const isInstance = Elym.isInstance(container);
+   * console.log(isInstance); // true
+   * ```
+   */
   public static isInstance(node: HTMLElement | SVGElement): boolean {
     return Elym.instances.has(node);
   }
 
   /**
-   * Selects a single child element within the constructed DOM structure.
+   * Selects a single child element of an Elym instance.
    * @param {string} selector - The CSS selector to match the element.
    * @returns {this} The current instance for chaining.
+   * @remmarks
+   * The selectChild methods worrks on the elements that haven't been added to the DOM yet.
    * @example
    * ```ts
-   * const builder = new Elym('<div class="container"><h1>Hello, World!</h1></div>');
-   * builder.selectChild("h1").text("Hello, Elym!");
+   * const hello = new Elym('<div class="container"><h1>Hello, World!</h1></div>');
+   * hello.selectChild("h1").text("Hello, Elym!");
    * ```
    */
   public selectChild(selector: string): this {
@@ -168,15 +189,16 @@ export class Elym {
   }
 
   /**
-   * Selects multiple child elements within the constructed DOM structure.
+   * Selects multiple child elements of an Elym instance.
    * @param {string} selector - The CSS selector to match the elements.
    * @returns {this} The current instance for chaining.
+   * @remmarks
+   * The selectChildren methods worrks on the elements that haven't been added to the DOM yet.
    * @example
    * ```ts
-   * const builder = new Elym('<ul><li>Item 1</li><li>Item 2</li></ul>');
-   * builder.selectChildren("li").each((node, index) => {
-   *   console.log(`Item ${index + 1}: ${node.textContent}`);
-   * });
+   * const hello = new Elym('<div class="container"><h1>Hello, World!</h1><p>Paragraph</p></div>');
+   * hello.selectChildren("h1, p").text("Hello, Elym!");
+   * ```
    */
   public selectChildren(selector: string): this {
     this.#nodes = Array.from(
@@ -192,12 +214,12 @@ export class Elym {
    * @returns {this | string | null} The current instance for chaining or the attribute value.
    * @example
    * ```ts
-   * const builder = new Elym('<div class="container"></div>');
+   * const container = new Elym('<div class="container"></div>');
    * // Set an attribute
-   * builder.attr("id", "main-container");
+   * container.attr("id", "myId");
    * // Get an attribute
-   * const id = builder.attr("id");
-   * console.log(id); // "main-container"
+   * const id = container.attr("id");
+   * console.log(id); // "myId"
    * ```
    */
   public attr(attribute: string): string | null;
@@ -217,12 +239,12 @@ export class Elym {
    * @returns {this | string} The current instance for chaining or the text content.
    * @example
    * ```ts
-   * const builder = new Elym('<div class="container"><p>Initial text</p></div>');
+   * const paragraph = new Elym('<p>Hello, World!</p>');
    * // Set text content
-   * builder.select("p").text("Updated text");
+   * paragraph.text("Hello, Elym!");
    * // Get text content
-   * const text = builder.select("p").text();
-   * console.log(text); // "Updated text"
+   * const text = paragraph.text();
+   * console.log(text); // "Hello, Elym!"
    * ```
    */
   public text(): string;
@@ -242,7 +264,9 @@ export class Elym {
    * @returns {Elym} A new Elym instance wrapping the appended element.
    * @example
    * ```ts
-   * const builder = Elym.select(".container").append("span").attr("id", "myId");
+   * const listContainer = new Elym('<ul class="list-container"></ul>');
+   * listContainer.append("li").text("Item 1");
+   * listContainer.append("li").text("Item 2");
    * ```
    */
   public append(tagName: string): Elym {
@@ -270,10 +294,10 @@ export class Elym {
    * @returns {this} The current instance for chaining.
    * @example
    * ```ts
-   * const builder = new Elym('<div class="container"></div>');
-   * const child1 = document.createElement("p");
-   * const child2 = new Elym('<span></span>');
-   * builder.appendElements(child1, child2);
+   * const container = new Elym('<div class="container"></div>');
+   * const ul = document.createElement("ul");
+   * const li = new Elym('<li></li>');
+   * container.appendElements(child1, child2);
    * ```
    */
   public appendElements(...elements: (HTMLElement | Elym)[]): this {
@@ -294,12 +318,14 @@ export class Elym {
    * @returns {this | string | null} The current instance for chaining or the CSS property value.
    * @example
    * ```ts
-   * const builder = new Elym('<div class="container"></div>');
-   * // Set a CSS style property
-   * builder.style("background-color", "red");
-   * // Get a CSS style property
-   * const backgroundColor = builder.style("background-color");
+   * const container = new Elym('<div class="container"></div>');
+   * // Set a style property
+   * container.style("background-color", "red");
+   * // Get a style property
+   * const backgroundColor = container.style("background-color");
    * console.log(backgroundColor); // "red"
+   * // Set using an object
+   * container.style({ backgroundColor: "blue", color: "white" });
    * ```
    */
   public style(property: string): string | null;
@@ -469,11 +495,21 @@ export class Elym {
    * @param {HTMLElement | Elym} parent - The parent element.
    * @returns {this} The current instance for chaining.
    * @example
+   * Originally the html file is looking like:
+   * ```html
+   * <div class="container"></div>
+   * ```
    * ```ts
-   * const builder = new Elym('<div class="container"></div>');
+   * const container = Elym.select('<div class="container"></div>');
    * const child = document.createElement("p");
    * // Prepend the child element to the container
-   * builder.prepend(child);
+   * container.prepend(child);
+   * ```
+   * The html file will look like:
+   * ```html
+   * <div class="container">
+   *  <p></p>
+   * </div>
    * ```
    */
   public prepend(parent: HTMLElement | Elym): this {
@@ -528,11 +564,21 @@ export class Elym {
    * @param {HTMLElement} referenceElement - The reference element.
    * @returns {this} The current instance for chaining.
    * @example
+   * The original html file is looking like:
+   * ```html
+   * <p>Reference Element</p>
+   * ```
    * ```ts
+   * const paragraph = Elym.select('<p>Reference Element</p>');
    * const builder = new Elym('<div class="container"></div>');
-   * const referenceElement = document.createElement("p");
+   * const child = document.createElement("p");
    * // Insert the container before the reference element
-   * builder.insertBefore(referenceElement);
+   * builder.insertBefore(paragraph.root());
+   * ```
+   * The html file will look like:
+   * ```html
+   * <p>Reference Element</p></p>
+   * <div class="container"></div>
    * ```
    */
   public insertBefore(referenceElement: HTMLElement): this {
@@ -547,11 +593,21 @@ export class Elym {
    * @param {HTMLElement} referenceElement - The reference element.
    * @returns {this} The current instance for chaining.
    * @example
+   * The original html file is looking like:
+   * ```html
+   * <p>Reference Element</p>
+   * ```
    * ```ts
+   * const paragraph = Elym.select('<p>Reference Element</p>');
    * const builder = new Elym('<div class="container"></div>');
-   * const referenceElement = document.createElement("p");
+   * const child = document.createElement("p");
    * // Insert the container after the reference element
-   * builder.insertAfter(referenceElement);
+   * builder.insertAfter(paragraph.root());
+   * ```
+   * The html file will look like:
+   * ```html
+   * <p>Reference Element</p>
+   * <div class="container"></div>
    * ```
    */
   public insertAfter(referenceElement: HTMLElement): this {
@@ -569,11 +625,21 @@ export class Elym {
    * @param {HTMLElement | Elym} parent - The parent element.
    * @returns {this} The current instance for chaining.
    * @example
+   * The original html file is looking like:
+   * ```html
+   * <div class="container"></div>
+   * ```
    * ```ts
-   * const builder = new Elym('<div class="container"></div>');
-   * const child = document.createElement("p");
-   * // Append the child element to the container
-   * builder.appendTo(child);
+   * const builder = new Elym('<div></div>');
+   * const container = Elym.select('<div class="container"></div>');
+   * // Append the builder to the container
+   * builder.appendTo(container);
+   * ```
+   * The html file will look like:
+   * ```html
+   * <div class="container">
+   *  <div></div>
+   * </div>
    * ```
    */
   public appendTo(parent: HTMLElement | Elym): this {
@@ -622,7 +688,7 @@ export class Elym {
    * @example
    * ```ts
    * const builder = new Elym('<ul><li>Item 1</li><li>Item 2</li></ul>');
-   * builder.selectAll("li").each((node, index) => {
+   * builder.selectChildren("li").each((node, index) => {
    *   console.log(`Item ${index + 1}: ${node.textContent}`);
    * });
    * ```
@@ -655,6 +721,8 @@ export class Elym {
 
   /**
    * Removes the selected elements from the DOM.
+   * @remmarks
+   * The remove method also removes all event listeners and data bound to the elements.
    * @returns {this} The current instance for chaining.
    * @example
    * ```ts
@@ -794,7 +862,7 @@ export class Elym {
    * ```ts
    * const builder = new Elym('<ul><li></li><li></li></ul>');
    * const data = ["Item 1", "Item 2"];
-   * builder.selectAll("li").data(data, (node, datum) => {
+   * builder.selectChildren("li").data(data, (node, datum) => {
    *  node.textContent = datum;
    * });
    * ```
@@ -818,7 +886,7 @@ export class Elym {
    * @example
    * ```ts
    * const builder = new Elym('<div><p>Hello, World!</p></div>');
-   * builder.select("p").backToRoot().selectAll("p").text("Hello, Elym!");
+   * builder.selectChild("p").backToRoot().selectChildren("p").text("Hello, Elym!");
    * ```
    */
   public backToRoot(): this {
