@@ -7,12 +7,11 @@
   </head>
   <body>
     <h1>Test of elym</h1>
-    <p>Test of elym</p>
-    <section class="container"></section>
+    <section class="container" data-id="1"></section>
     <script type="module">
         import { Elym } from "./src/elym/elym.ts";
-        const container = Elym.select(".container").append("p").text("Hello, world!");
-        container.attr("id", "elym");
+        const container = Elym.select(".container");
+        container.append("p").text("Hello world");
     </script>
   </body>
 </html>

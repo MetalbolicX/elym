@@ -103,7 +103,7 @@ export class Elym {
     if (elements.length === 0) {
       throw new Error("At least one element must be provided");
     }
-    const instance = new Elym('<div></div>'); // Temporary root element
+    const instance = new Elym("<div></div>"); // Temporary root element
     instance.#root = elements[0] as HTMLElement;
     instance.#nodes = elements as (HTMLElement | SVGElement)[];
     instance.#nodes.forEach((node) => Elym.instances.set(node, instance));
@@ -123,7 +123,10 @@ export class Elym {
   constructor(htmlTemplate: string) {
     const rootElement = Elym.createFromTemplate(htmlTemplate);
     if (
-      !(rootElement instanceof HTMLElement || rootElement instanceof SVGSVGElement)
+      !(
+        rootElement instanceof HTMLElement ||
+        rootElement instanceof SVGSVGElement
+      )
     ) {
       throw new Error("Invalid root element created");
     }
@@ -225,11 +228,11 @@ export class Elym {
   public attr(attribute: string): string | null;
   public attr(attribute: string, value: string): this;
   public attr(attribute: string, value?: string): this | string | null {
-    if (!value) {
+    if (arguments.length === 1) {
       const [firstNode] = this._nodes;
-      return this.nodes.length ? firstNode.getAttribute(attribute) : null;
+      return this._nodes.length ? firstNode.getAttribute(attribute) : null;
     }
-    this._nodes.forEach((node) => node.setAttribute(attribute, value));
+    this._nodes.forEach((node) => node.setAttribute(attribute, value!));
     return this;
   }
 
