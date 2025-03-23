@@ -172,6 +172,38 @@ export class Elym {
   }
 
   /**
+   * Checks if an Elym instance is associated with a given DOM element using a selector.
+   * @param {string} selector - The CSS selector to match the element.
+   * @returns {boolean} True if an instance is associated with the node, otherwise false.
+   * @example
+   * ```ts
+   * const isInstance = Elym.isInstanceBySelector(".container");
+   * console.log(isInstance); // true or false
+   * ```
+   */
+  public static isInstanceBySelector(selector: string): boolean {
+    const element = document.querySelector(selector);
+    return element ? Elym.instances.has(element as HTMLElement) : false;
+  }
+
+  /**
+   * Retrieves the Elym instance associated with a given DOM element using a selector.
+   * @param {string} selector - The CSS selector to match the element.
+   * @returns {Elym | null} The Elym instance associated with the given node, or null if no instance is found.
+   * @example
+   * ```ts
+   * const instance = Elym.getInstanceBySelector(".container");
+   * if (instance) {
+   *   instance.selectChild("h1").text("Hello, Elym!");
+   * }
+   * ```
+   */
+  public static getInstanceBySelector(selector: string): Elym | null {
+    const element = document.querySelector(selector);
+    return element ? Elym.instances.get(element as HTMLElement) || null : null;
+  }
+
+  /**
    * Selects a single child element of an Elym instance.
    * @param {string} selector - The CSS selector to match the element.
    * @returns {this} The current instance for chaining.
