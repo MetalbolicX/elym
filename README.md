@@ -23,13 +23,12 @@ const heroes = new Elym(`
         <li>Wonder woman</li>
     </ul>
 `)
-.selectAll("li")
+.selectChildren("li")
 .on("click", ({ target }: Event) => {
     alert(`${target.textContent} was clicked.`);
 });
 
 const container = document.getElementById("container");
-
 container?.appendChild(heroes.root());
 ```
 
